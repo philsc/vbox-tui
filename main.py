@@ -2,22 +2,41 @@
 
 import urwid
 
+class VMWidget (urwid.WidgetWrap):
+
+    def __init__ (self, state, name):
+        self.state = state
+        self.content = name
+        self.item = urwid.AttrMap(
+                urwid.Text('%-15s  %s' % (state, name)), 'body', 'focus'
+                )
+        self.__super.__init__(self.item)
+
+    def selectable (self):
+        return True
+
+    def keypress(self, size, key):
+        return key
+
+
 def handle_input(key):
     if key in ('q', 'Q'):
         raise urwid.ExitMainLoop()
 
 palette = [
         ('highlight', 'black', 'brown'),
+        ('body','dark cyan', ''),
+        ('focus','dark red', 'black'),
         ]
 
-shortcuts = urwid.Text(('highlight', ' q: Quit'))
-shortcuts_wrapper = urwid.AttrMap(shortcuts, 'highlight')
+vms = 'foo lkj kj lskjdf jlklekj f'.split()
 
-pile = urwid.Pile([
-    urwid.Filler(shortcuts_wrapper),
-    ])
+shortcuts = urwid.AttrMap(urwid.Text(' q: Quit'), 'highlight')
+listbox = urwid.ListBox(urwid.SimpleListWalker([VMWidget('foo', v) for v in vms]))
+label = urwid.AttrMap(urwid.Text(' VM Selection'), 'highlight')
 
-main = urwid.Frame(pile)
+main = urwid.Frame(urwid.AttrMap(listbox, 'body'), header=shortcuts, \
+        footer=label)
 
 loop = urwid.MainLoop(main, palette=palette, unhandled_input=handle_input)
 loop.screen.set_terminal_properties(colors=16)
