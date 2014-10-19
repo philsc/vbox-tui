@@ -23,6 +23,18 @@ def handle_input(key):
     if key in ('q', 'Q'):
         raise urwid.ExitMainLoop()
 
+    elif key in ('j'):
+        try:
+            listbox.set_focus(listbox.focus_position + 1)
+        except IndexError:
+            pass
+
+    elif key in ('k'):
+        try:
+            listbox.set_focus(listbox.focus_position - 1)
+        except IndexError:
+            pass
+
 palette = [
         ('highlight', 'black', 'brown'),
         ('body','dark cyan', ''),
