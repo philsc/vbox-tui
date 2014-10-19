@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 import urwid
+import subprocess
+import shlex
+import re
 
 class VMWidget (urwid.WidgetWrap):
 
@@ -17,6 +20,36 @@ class VMWidget (urwid.WidgetWrap):
 
     def keypress(self, size, key):
         return key
+
+class VBox(object):
+    command = 'VBoxManage'
+
+    def vms(self):
+        out = self._cmd('list vms')
+        vms = []
+
+        for line in out.splitlines():
+            m = re.search(r'"([a-zA-Z0-9-_]+)"', line)
+            if m:
+                name = m.group(1)
+                state = self.state(name)
+                vms.append((state, name))
+
+        return vms
+
+    def state(self, name):
+        out = self._cmd('showvminfo ' + name)
+
+        for line in out.splitlines():
+            if line.startswith('State:'):
+                m = re.search(r'State:\s+([^(]+) \(', out)
+                if m: return m.group(1)
+
+        raise Exception('Could not find state for VM "%s".' % name)
+
+    def _cmd(self, cmd):
+        out = subprocess.check_output([self.command] + shlex.split(cmd))
+        return out.decode('utf-8')
 
 def switch_list(listbox):
     global current_listbox
@@ -51,12 +84,13 @@ palette = [
         ('focus','dark red', 'black'),
         ]
 
-vms = 'foo lkj kj lskjdf jlklekj f'.split()
+vbox = VBox()
+vms = vbox.vms()
 
 listbox_vms = urwid.ListBox(urwid.SimpleListWalker( \
-        [VMWidget('foo', v) for v in vms]))
+        [VMWidget(v[0], v[1]) for v in vms]))
 listbox_props = urwid.ListBox(urwid.SimpleListWalker( \
-        [VMWidget('barr', v + ' me') for v in vms]))
+        [VMWidget('barr', v[1] + ' me') for v in vms]))
 
 current_listbox = listbox_vms
 
