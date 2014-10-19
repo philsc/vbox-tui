@@ -21,6 +21,23 @@ class VMWidget (urwid.WidgetWrap):
     def keypress(self, size, key):
         return key
 
+class PropWidget(urwid.WidgetWrap):
+
+    def __init__(self, prop, value):
+        self.prop = prop
+        self.value = value
+        self.item = urwid.AttrMap(
+                urwid.Text(' %15s:  %s' % (prop, value)), 'body', 'focus'
+                )
+        self.__super.__init__(self.item)
+
+    def selectable(self):
+        return True
+
+    def keypress(self, size, key):
+        return key
+
+
 class VBox(object):
     command = 'VBoxManage'
 
@@ -98,7 +115,7 @@ def handle_input(key):
             vm = current_listbox.focus
             if vm:
                 props = vbox.properties(vm.name)
-                listwalker_props[:] = [VMWidget(k, props[k]) for k in props]
+                listwalker_props[:] = [PropWidget(k, props[k]) for k in props]
                 switch_list(listbox_props)
 
 palette = [
