@@ -9,7 +9,7 @@ class VMWidget (urwid.WidgetWrap):
 
     def __init__ (self, state, name):
         self.state = state
-        self.content = name
+        self.name = name
         self.item = urwid.AttrMap(
                 urwid.Text('%-15s  %s' % (state, name)), 'body', 'focus'
                 )
@@ -24,6 +24,13 @@ class VMWidget (urwid.WidgetWrap):
 class VBox(object):
     command = 'VBoxManage'
 
+    PROPERTIES = [
+            'Guest OS',
+            'Number of CPUs',
+            'Memory size',
+            'VRAM size',
+            ]
+
     def vms(self):
         out = self._cmd('list vms')
         vms = []
@@ -37,13 +44,25 @@ class VBox(object):
 
         return vms
 
-    def state(self, name):
+    def properties(self, name):
         out = self._cmd('showvminfo ' + name)
 
+        # Create a copy of the properties list so we can modify it.
+        property_names = list(self.PROPERTIES)
+        props = {}
+
         for line in out.splitlines():
-            if line.startswith('State:'):
-                m = re.search(r'State:\s+([^(]+) \(', out)
-                if m: return m.group(1)
+            for prop_name in property_names:
+                if line.startswith(prop_name):
+                    m = re.search(r'%s:\s+(.+)' % prop_name, line)
+                    if m: props[prop_name] = m.group(1)
+
+        return props
+
+    def state(self, name):
+        out = self._cmd('showvminfo ' + name)
+        m = re.search(r'State:\s+([^(]+) \(', out)
+        if m: return m.group(1)
 
         raise Exception('Could not find state for VM "%s".' % name)
 
@@ -76,7 +95,11 @@ def handle_input(key):
         if current_listbox is listbox_props:
             switch_list(listbox_vms)
         else:
-            switch_list(listbox_props)
+            vm = current_listbox.focus
+            if vm:
+                props = vbox.properties(vm.name)
+                listwalker_props[:] = [VMWidget(k, props[k]) for k in props]
+                switch_list(listbox_props)
 
 palette = [
         ('highlight', 'black', 'brown'),
@@ -87,10 +110,11 @@ palette = [
 vbox = VBox()
 vms = vbox.vms()
 
-listbox_vms = urwid.ListBox(urwid.SimpleListWalker( \
-        [VMWidget(v[0], v[1]) for v in vms]))
-listbox_props = urwid.ListBox(urwid.SimpleListWalker( \
-        [VMWidget('barr', v[1] + ' me') for v in vms]))
+listwalker_vms = urwid.SimpleListWalker([VMWidget(v[0], v[1]) for v in vms])
+listwalker_props = urwid.SimpleListWalker([])
+
+listbox_vms = urwid.ListBox(listwalker_vms)
+listbox_props = urwid.ListBox(listwalker_props)
 
 current_listbox = listbox_vms
 
