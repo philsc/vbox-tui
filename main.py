@@ -21,6 +21,10 @@ class EditDialog(urwid.WidgetWrap):
         if key in ('enter',):
             self.parent.update_value(self.edit.edit_text)
             self._emit('close')
+
+        elif key in ('esc',):
+            self._emit('close')
+
         else:
             self.__super.keypress(size, key)
 
@@ -38,7 +42,7 @@ class VMWidget (urwid.WidgetWrap):
         return True
 
     def keypress(self, size, key):
-        if key in ('e',):
+        if key in ('e', 'enter', 'l'):
             window.switch('props')
         else:
             return key
@@ -147,7 +151,7 @@ class Screen(object):
 class Window(object):
 
     def __init__(self, screens):
-        self.shortcuts_text = urwid.Text(' q: Quit')
+        self.shortcuts_text = urwid.Text(' q: Quit / r: Refresh')
         self.label_text = urwid.Text(' VM Selection')
         self.shortcuts = urwid.AttrMap(self.shortcuts_text, 'highlight')
         self.label = urwid.AttrMap(self.label_text, 'highlight')
@@ -187,6 +191,9 @@ class Window(object):
     def handle_input(self, key):
         if key in ('q', 'Q'):
             raise urwid.ExitMainLoop()
+
+        if key in ('r', 'R'):
+            self.screens[self.current_screen].update()
 
         elif key in ('j',):
             self.move_selection(1)
