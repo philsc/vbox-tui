@@ -5,6 +5,23 @@ import subprocess
 import shlex
 import re
 
+class EditDialog(urwid.WidgetWrap):
+
+    signals = ['close']
+
+    def __init__(self):
+        label = urwid.Text("Edit dialog!")
+        edit = urwid.Edit()
+        pile = urwid.Pile([label, edit])
+        fill = urwid.Filler(pile)
+        self.__super.__init__(urwid.AttrWrap(fill, 'popbg'))
+
+    def keypress(self, size, key):
+        if key in ('enter',):
+            self._emit('close')
+        else:
+            self.__super.keypress(size, key)
+
 class VMWidget (urwid.WidgetWrap):
 
     def __init__ (self, state, name):
@@ -21,7 +38,7 @@ class VMWidget (urwid.WidgetWrap):
     def keypress(self, size, key):
         return key
 
-class PropWidget(urwid.WidgetWrap):
+class PropWidget(urwid.PopUpLauncher):
 
     def __init__(self, prop, value):
         self.prop = prop
@@ -36,9 +53,18 @@ class PropWidget(urwid.WidgetWrap):
 
     def keypress(self, size, key):
         if key in ('e',):
-            pass
+            self.open_pop_up()
         else:
             return key
+
+    def create_pop_up(self):
+        pop_up = EditDialog()
+        urwid.connect_signal(pop_up, 'close',
+                lambda button: self.close_pop_up())
+        return pop_up
+
+    def get_pop_up_parameters(self):
+        return {'left': 0, 'top': 1, 'overlay_width': 32, 'overlay_height': 7}
 
 
 class VBox(object):
@@ -125,6 +151,7 @@ palette = [
         ('highlight', 'black', 'brown'),
         ('body','dark cyan', ''),
         ('focus','dark red', 'black'),
+        ('popbg', 'white', 'dark blue'),
         ]
 
 vbox = VBox()
@@ -141,6 +168,8 @@ current_listbox = listbox_vms
 shortcuts_text = urwid.Text(' q: Quit')
 label_text = urwid.Text(' VM Selection')
 
+
+
 shortcuts = urwid.AttrMap(shortcuts_text, 'highlight')
 listbox_vms_map = urwid.AttrMap(listbox_vms, 'body')
 listbox_props_map = urwid.AttrMap(listbox_props, 'body')
@@ -148,6 +177,7 @@ label = urwid.AttrMap(label_text, 'highlight')
 
 main = urwid.Frame(listbox_vms_map, header=shortcuts, footer=label)
 
-loop = urwid.MainLoop(main, palette=palette, unhandled_input=handle_input)
+loop = urwid.MainLoop(main, palette=palette, unhandled_input=handle_input, \
+        pop_ups=True)
 loop.screen.set_terminal_properties(colors=16)
 loop.run()
