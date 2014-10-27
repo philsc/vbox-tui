@@ -35,7 +35,10 @@ class PropWidget(urwid.WidgetWrap):
         return True
 
     def keypress(self, size, key):
-        return key
+        if key in ('e',):
+            pass
+        else:
+            return key
 
 
 class VBox(object):
@@ -135,10 +138,13 @@ listbox_props = urwid.ListBox(listwalker_props)
 
 current_listbox = listbox_vms
 
-shortcuts = urwid.AttrMap(urwid.Text(' q: Quit'), 'highlight')
+shortcuts_text = urwid.Text(' q: Quit')
+label_text = urwid.Text(' VM Selection')
+
+shortcuts = urwid.AttrMap(shortcuts_text, 'highlight')
 listbox_vms_map = urwid.AttrMap(listbox_vms, 'body')
 listbox_props_map = urwid.AttrMap(listbox_props, 'body')
-label = urwid.AttrMap(urwid.Text(' VM Selection'), 'highlight')
+label = urwid.AttrMap(label_text, 'highlight')
 
 main = urwid.Frame(listbox_vms_map, header=shortcuts, footer=label)
 
