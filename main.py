@@ -9,15 +9,17 @@ class EditDialog(urwid.WidgetWrap):
 
     signals = ['close']
 
-    def __init__(self):
-        label = urwid.Text("Edit dialog!")
-        edit = urwid.Edit()
-        pile = urwid.Pile([label, edit])
+    def __init__(self, parent):
+        self.parent = parent
+        self.label = urwid.Text("Edit dialog!")
+        self.edit = urwid.Edit(edit_text=parent.value)
+        pile = urwid.Pile([self.label, self.edit])
         fill = urwid.Filler(pile)
         self.__super.__init__(urwid.AttrWrap(fill, 'popbg'))
 
     def keypress(self, size, key):
         if key in ('enter',):
+            self.parent.update_value(self.edit.edit_text)
             self._emit('close')
         else:
             self.__super.keypress(size, key)
@@ -42,10 +44,9 @@ class PropWidget(urwid.PopUpLauncher):
 
     def __init__(self, prop, value):
         self.prop = prop
-        self.value = value
-        self.item = urwid.AttrMap(
-                urwid.Text(' %15s:  %s' % (prop, value)), 'body', 'focus'
-                )
+        self.value = None
+        self.item = urwid.AttrMap(urwid.Text('placeholder'), 'body', 'focus')
+        self.update_value(value)
         self.__super.__init__(self.item)
 
     def selectable(self):
@@ -58,13 +59,17 @@ class PropWidget(urwid.PopUpLauncher):
             return key
 
     def create_pop_up(self):
-        pop_up = EditDialog()
+        pop_up = EditDialog(self)
         urwid.connect_signal(pop_up, 'close',
                 lambda button: self.close_pop_up())
         return pop_up
 
     def get_pop_up_parameters(self):
         return {'left': 0, 'top': 1, 'overlay_width': 32, 'overlay_height': 7}
+
+    def update_value(self, new_value):
+        self.value = new_value
+        self.item.original_widget.set_text(' %15s:  %s' % (self.prop, self.value))
 
 
 class VBox(object):
