@@ -38,7 +38,10 @@ class VMWidget (urwid.WidgetWrap):
         return True
 
     def keypress(self, size, key):
-        return key
+        if key in ('e',):
+            window.switch('props')
+        else:
+            return key
 
 class PropWidget(urwid.PopUpLauncher):
 
@@ -121,68 +124,87 @@ class VBox(object):
         out = subprocess.check_output([self.command] + shlex.split(cmd))
         return out.decode('utf-8')
 
-def switch_list(listbox):
-    global current_listbox
-    current_listbox = listbox
-    main.contents.update(body=(listbox, None))
 
-def handle_input(key):
-    if key in ('q', 'Q'):
-        raise urwid.ExitMainLoop()
+class Screen(object):
 
-    elif key in ('j',):
+    def __init__(self, generator):
+        self.generator = generator
+        self.listwalker = urwid.SimpleListWalker([])
+
+    def update(self):
+        self.listwalker[:] = self.generator()
+
+    def get_current(self):
+        vm = self.listwalker.focus
+        if vm:
+            return self.listwalker[vm].name
+
+        raise Exception('Could not determine current focus')
+
+    def move(self, increment):
+        current_listbox.set_focus(current_listbox.focus_position + 1)
+
+class Window(object):
+
+    def __init__(self, screens):
+        self.shortcuts_text = urwid.Text(' q: Quit')
+        self.label_text = urwid.Text(' VM Selection')
+        self.shortcuts = urwid.AttrMap(self.shortcuts_text, 'highlight')
+        self.label = urwid.AttrMap(self.label_text, 'highlight')
+        self.screens = screens
+        self.current_screen = ''
+
+        palette = [
+                ('highlight', 'black', 'brown'),
+                ('body','dark cyan', ''),
+                ('focus','dark red', 'black'),
+                ('popbg', 'white', 'dark blue'),
+                ]
+
+        temp_list = self.wrap_listwalker(urwid.SimpleListWalker([]))
+        self.main = urwid.Frame(temp_list, header=self.shortcuts, footer=self.label)
+
+        self.loop = urwid.MainLoop(self.main, palette=palette, unhandled_input=self.handle_input, \
+                pop_ups=True)
+        self.loop.screen.set_terminal_properties(colors=16)
+
+    def wrap_listwalker(self, listwalker):
+        return urwid.AttrMap(urwid.ListBox(listwalker), 'body')
+
+    def move_selection(self, count):
+        listbox = self.main.contents['body'][0].original_widget
         try:
-            current_listbox.set_focus(current_listbox.focus_position + 1)
+            listbox.set_focus(listbox.focus_position + count)
         except IndexError:
             pass
 
-    elif key in ('k',):
-        try:
-            current_listbox.set_focus(current_listbox.focus_position - 1)
-        except IndexError:
-            pass
+    def switch(self, next_screen):
+        self.current_screen = next_screen
+        self.screens[next_screen].update()
+        listbox = self.wrap_listwalker(self.screens[next_screen].listwalker)
+        self.main.contents.update(body=(listbox, None))
 
-    elif key in ('e',):
-        if current_listbox is listbox_props:
-            switch_list(listbox_vms)
-        else:
-            vm = current_listbox.focus
-            if vm:
-                props = vbox.properties(vm.name)
-                listwalker_props[:] = [PropWidget(k, props[k]) for k in props]
-                switch_list(listbox_props)
+    def handle_input(self, key):
+        if key in ('q', 'Q'):
+            raise urwid.ExitMainLoop()
 
-palette = [
-        ('highlight', 'black', 'brown'),
-        ('body','dark cyan', ''),
-        ('focus','dark red', 'black'),
-        ('popbg', 'white', 'dark blue'),
-        ]
+        elif key in ('j',):
+            self.move_selection(1)
+
+        elif key in ('k',):
+            self.move_selection(-1)
+
+    def run(self):
+        self.loop.run()
+
 
 vbox = VBox()
-vms = vbox.vms()
 
-listwalker_vms = urwid.SimpleListWalker([VMWidget(v[0], v[1]) for v in vms])
-listwalker_props = urwid.SimpleListWalker([])
+screens = {
+        'vm': Screen(lambda: [VMWidget(v[0], v[1]) for v in vbox.vms()]),
+        'props': Screen(lambda: [PropWidget(k, v) for k,v in vbox.properties(screens['vm'].get_current()).items()]),
+        }
 
-listbox_vms = urwid.ListBox(listwalker_vms)
-listbox_props = urwid.ListBox(listwalker_props)
-
-current_listbox = listbox_vms
-
-shortcuts_text = urwid.Text(' q: Quit')
-label_text = urwid.Text(' VM Selection')
-
-
-
-shortcuts = urwid.AttrMap(shortcuts_text, 'highlight')
-listbox_vms_map = urwid.AttrMap(listbox_vms, 'body')
-listbox_props_map = urwid.AttrMap(listbox_props, 'body')
-label = urwid.AttrMap(label_text, 'highlight')
-
-main = urwid.Frame(listbox_vms_map, header=shortcuts, footer=label)
-
-loop = urwid.MainLoop(main, palette=palette, unhandled_input=handle_input, \
-        pop_ups=True)
-loop.screen.set_terminal_properties(colors=16)
-loop.run()
+window = Window(screens)
+window.switch('vm')
+window.run()
