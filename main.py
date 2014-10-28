@@ -44,6 +44,10 @@ class VMWidget (urwid.WidgetWrap):
     def keypress(self, size, key):
         if key in ('e', 'enter', 'l'):
             window.new_screen('props', [self.name])
+
+        elif key in ('u',):
+            window.new_screen('usb', [self.name])
+
         else:
             return key
 
@@ -78,6 +82,19 @@ class PropWidget(urwid.PopUpLauncher):
         self.value = new_value
         self.item.original_widget.set_text(' %15s:  %s' % (self.prop, self.value))
 
+class USBWidget(urwid.WidgetWrap):
+
+    def __init__(self, name):
+        self.name = name
+        self.item = urwid.AttrMap(urwid.Text(' %s' % (name)), 'body', 'focus')
+        self.__super.__init__(self.item)
+
+    def selectable(self):
+        return True
+
+    def keypress(self, size, key):
+        return key
+
 
 class VBox(object):
     command = 'VBoxManage'
@@ -87,6 +104,12 @@ class VBox(object):
             'Number of CPUs',
             'Memory size',
             'VRAM size',
+            ]
+
+    USB_PARSER = [
+            ('VendorId', '.*\((.*)\)$'),
+            ('ProductId', '.*\((.*)\)$'),
+            ('Product', '(.*)$'),
             ]
 
     def vms(self):
@@ -123,6 +146,26 @@ class VBox(object):
         if m: return m.group(1)
 
         raise Exception('Could not find state for VM "%s".' % name)
+
+    def usb_list(self, name):
+        out = self._cmd('list usbhost')
+
+        usb_devices = []
+
+        current_usb_device = dict([(k[0], None) for k in self.USB_PARSER])
+
+        for line in out.splitlines():
+            for usb_field in self.USB_PARSER:
+                if line.startswith(usb_field[0] + ':'):
+                    m = re.search(r'%s:\s+%s' % usb_field, line)
+                    if m:
+                        current_usb_device[usb_field[0]] = m.group(1)
+
+                    # Once we've parsed all fields for one USB device, save it.
+                    if usb_field[0] == self.USB_PARSER[-1][0]:
+                        usb_devices.append(current_usb_device.copy())
+
+        return usb_devices
 
     def _cmd(self, cmd):
         out = subprocess.check_output([self.command] + shlex.split(cmd))
@@ -233,9 +276,14 @@ def update_props(args):
     vm_name = args[0]
     return [PropWidget(k, v) for k,v in vbox.properties(vm_name).items()]
 
+def update_usb_list(args):
+    vm_name = args[0]
+    return [USBWidget(usb['Product']) for usb in vbox.usb_list(vm_name)]
+
 screens = {
         'vm': Screen(update_vms),
         'props': Screen(update_props),
+        'usb': Screen(update_usb_list),
         }
 
 window = Window(screens, 'vm')
