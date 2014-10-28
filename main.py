@@ -145,8 +145,6 @@ class Screen(object):
 
         raise Exception('Could not determine current focus')
 
-    def move(self, increment):
-        current_listbox.set_focus(current_listbox.focus_position + 1)
 
 class Window(object):
 
