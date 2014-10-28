@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import urwid
 import subprocess
@@ -155,8 +155,9 @@ class Window(object):
         self.label_text = urwid.Text(' VM Selection')
         self.shortcuts = urwid.AttrMap(self.shortcuts_text, 'highlight')
         self.label = urwid.AttrMap(self.label_text, 'highlight')
-        self.screens = screens
-        self.current_screen = ''
+
+        nil_screen = {'__nil__': Screen(lambda: [])}
+        self.screens = dict(screens.items() | nil_screen.items())
 
         palette = [
                 ('highlight', 'black', 'brown'),
@@ -165,12 +166,14 @@ class Window(object):
                 ('popbg', 'white', 'dark blue'),
                 ]
 
-        temp_list = self.wrap_listwalker(urwid.SimpleListWalker([]))
-        self.main = urwid.Frame(temp_list, header=self.shortcuts, footer=self.label)
+        self.main = urwid.Frame(urwid.Text(''), header=self.shortcuts, 
+                footer=self.label)
 
-        self.loop = urwid.MainLoop(self.main, palette=palette, unhandled_input=self.handle_input, \
-                pop_ups=True)
+        self.loop = urwid.MainLoop(self.main, palette=palette, \
+                unhandled_input=self.handle_input, pop_ups=True)
         self.loop.screen.set_terminal_properties(colors=16)
+
+        self.switch('__nil__')
 
     def wrap_listwalker(self, listwalker):
         return urwid.AttrMap(urwid.ListBox(listwalker), 'body')
