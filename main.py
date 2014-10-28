@@ -43,7 +43,7 @@ class VMWidget (urwid.WidgetWrap):
 
     def keypress(self, size, key):
         if key in ('e', 'enter', 'l'):
-            window.switch('props')
+            window.new_screen('props')
         else:
             return key
 
@@ -60,7 +60,7 @@ class PropWidget(urwid.PopUpLauncher):
         return True
 
     def keypress(self, size, key):
-        if key in ('e',):
+        if key in ('e', 'l'):
             self.open_pop_up()
         else:
             return key
@@ -150,7 +150,7 @@ class Screen(object):
 
 class Window(object):
 
-    def __init__(self, screens):
+    def __init__(self, screens, first_screen):
         self.shortcuts_text = urwid.Text(' q: Quit / r: Refresh')
         self.label_text = urwid.Text(' VM Selection')
         self.shortcuts = urwid.AttrMap(self.shortcuts_text, 'highlight')
@@ -158,6 +158,7 @@ class Window(object):
 
         nil_screen = {'__nil__': Screen(lambda: [])}
         self.screens = dict(screens.items() | nil_screen.items())
+        self.screen_stack = ['__nil__']
 
         palette = [
                 ('highlight', 'black', 'brown'),
@@ -173,7 +174,8 @@ class Window(object):
                 unhandled_input=self.handle_input, pop_ups=True)
         self.loop.screen.set_terminal_properties(colors=16)
 
-        self.switch('__nil__')
+        self._switch('__nil__')
+        self.new_screen(first_screen)
 
     def wrap_listwalker(self, listwalker):
         return urwid.AttrMap(urwid.ListBox(listwalker), 'body')
@@ -185,9 +187,21 @@ class Window(object):
         except IndexError:
             pass
 
-    def switch(self, next_screen):
+    def new_screen(self, next_screen):
+        self.screen_stack.append(self.current_screen)
+        self._switch(next_screen)
+
+    def last_screen(self):
+        if self.screen_stack[-1] == '__nil__':
+            return
+
+        screen = self.screen_stack.pop()
+        self._switch(screen)
+
+    def _switch(self, next_screen):
         self.current_screen = next_screen
         self.screens[next_screen].update()
+
         listbox = self.wrap_listwalker(self.screens[next_screen].listwalker)
         self.main.contents.update(body=(listbox, None))
 
@@ -204,6 +218,9 @@ class Window(object):
         elif key in ('k',):
             self.move_selection(-1)
 
+        elif key in ('h', 'esc'):
+            self.last_screen()
+
     def run(self):
         self.loop.run()
 
@@ -215,6 +232,5 @@ screens = {
         'props': Screen(lambda: [PropWidget(k, v) for k,v in vbox.properties(screens['vm'].get_current()).items()]),
         }
 
-window = Window(screens)
-window.switch('vm')
+window = Window(screens, 'vm')
 window.run()
