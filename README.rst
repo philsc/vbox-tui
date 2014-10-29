@@ -41,3 +41,5 @@ TODO
 - Actually let people modify values such as Memory, CPUs, etc..
 - Make the shortcuts pane (at the top of the screen) and the label pane (at the 
   bottom of the screen) adjustable on a per-screen basis.
+- Make use of the official vboxapi Python module. I can't believe I didn't find 
+  this when I first started working on this project.
