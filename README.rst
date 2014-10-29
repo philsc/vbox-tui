@@ -6,7 +6,7 @@ Text-based UI frontend to VirtualBox' command line tools.
 Requirements
 ============
 - Python 3.x
-- Urwid Library (<http://urwid.org>)
+- Urwid Library (http://urwid.org)
 
 I would recommend to grab the latest urwid library via ``pip`` or your other 
 favourite python package manager. I've been having trouble with the version 
@@ -37,6 +37,7 @@ Limitations
 
 TODO
 ====
+- Let people start/stop/suspend VMs from the main screen.
 - Actually let people modify values such as Memory, CPUs, etc..
 - Make the shortcuts pane (at the top of the screen) and the label pane (at the 
   bottom of the screen) adjustable on a per-screen basis.
