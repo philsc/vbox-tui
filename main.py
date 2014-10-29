@@ -84,28 +84,46 @@ class PropWidget(urwid.PopUpLauncher):
 
 class USBWidget(urwid.WidgetWrap):
 
-    def __init__(self, attributes):
+    def __init__(self, vm_name, attributes):
+        self.vm_name = vm_name
         self.attributes = attributes
-
-        name = attributes['Product']
-
-        if attributes['Current State'] == 'Busy':
-            selector = ''
-        elif attributes['AttachedToThisVM']:
-            selector = '(x)'
-        else:
-            selector = '( )'
-
-        self.item = urwid.AttrMap(urwid.Text(' %-3s %s' % (selector, name)), \
-                'body', 'focus')
-
+        self.item = urwid.AttrMap(urwid.Text(''), 'body', 'focus')
+        self._update_text()
         self.__super.__init__(self.item)
 
     def selectable(self):
         return True
 
     def keypress(self, size, key):
+        if key in (' ', 'enter', 'l'):
+            if self.attributes['Current State'] != 'Busy':
+                if self.attributes['AttachedToThisVM']:
+                    action = 'detach'
+                else:
+                    action = 'attach'
+
+                try:
+                    vbox.modify_usb(self.vm_name, action, \
+                            self.attributes['UUID'])
+                except:
+                    return
+
+                self.attributes['AttachedToThisVM'] ^= True
+                self._update_text()
+
         return key
+
+    def _update_text(self):
+        name = self.attributes['Product']
+
+        if self.attributes['Current State'] == 'Busy':
+            selector = ''
+        elif self.attributes['AttachedToThisVM']:
+            selector = '(x)'
+        else:
+            selector = '( )'
+
+        self.item.original_widget.set_text(' %-3s %s' % (selector, name))
 
 
 class VBox(object):
@@ -188,6 +206,11 @@ class VBox(object):
                         usb_devices.append(current_usb_device.copy())
 
         return usb_devices
+
+    def modify_usb(self, vm_name, action, usb_uuid):
+        if not action in ('attach', 'detach'): return
+
+        out = self._cmd('controlvm %s usb%s %s' % (vm_name, action, usb_uuid))
 
     def _cmd(self, cmd):
         out = subprocess.check_output([self.command] + shlex.split(cmd))
@@ -300,7 +323,8 @@ def update_props(args):
 
 def update_usb_list(args):
     vm_name = args[0]
-    return [USBWidget(attributes) for attributes in vbox.usb_list(vm_name)]
+    return [USBWidget(vm_name, attributes) for attributes in \
+            vbox.usb_list(vm_name)]
 
 screens = {
         'vm': Screen(update_vms),
