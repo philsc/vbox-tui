@@ -84,9 +84,21 @@ class PropWidget(urwid.PopUpLauncher):
 
 class USBWidget(urwid.WidgetWrap):
 
-    def __init__(self, name):
-        self.name = name
-        self.item = urwid.AttrMap(urwid.Text(' %s' % (name)), 'body', 'focus')
+    def __init__(self, attributes):
+        self.attributes = attributes
+
+        name = attributes['Product']
+
+        if attributes['Current State'] == 'Busy':
+            selector = ''
+        elif attributes['AttachedToThisVM']:
+            selector = '(x)'
+        else:
+            selector = '( )'
+
+        self.item = urwid.AttrMap(urwid.Text(' %-3s %s' % (selector, name)), \
+                'body', 'focus')
+
         self.__super.__init__(self.item)
 
     def selectable(self):
@@ -288,7 +300,7 @@ def update_props(args):
 
 def update_usb_list(args):
     vm_name = args[0]
-    return [USBWidget(usb['Product']) for usb in vbox.usb_list(vm_name)]
+    return [USBWidget(attributes) for attributes in vbox.usb_list(vm_name)]
 
 screens = {
         'vm': Screen(update_vms),
