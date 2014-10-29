@@ -107,9 +107,11 @@ class VBox(object):
             ]
 
     USB_PARSER = [
+            ('UUID', '([a-zA-Z0-9-]+)'),
             ('VendorId', '.*\((.*)\)$'),
             ('ProductId', '.*\((.*)\)$'),
             ('Product', '(.*)$'),
+            ('Current State', '(.*)'),
             ]
 
     def vms(self):
@@ -148,13 +150,19 @@ class VBox(object):
         raise Exception('Could not find state for VM "%s".' % name)
 
     def usb_list(self, name):
-        out = self._cmd('list usbhost')
+        out_usb = self._cmd('list usbhost')
+        out_info = self._cmd('showvminfo ' + name)
 
+        vm_uuids = []
         usb_devices = []
 
         current_usb_device = dict([(k[0], None) for k in self.USB_PARSER])
 
-        for line in out.splitlines():
+        for line in out_info.splitlines():
+            m = re.search(r'^UUID:\s+([a-zA-Z0-9-]+)', line)
+            if m: vm_uuids.append(m.group(1))
+
+        for line in out_usb.splitlines():
             for usb_field in self.USB_PARSER:
                 if line.startswith(usb_field[0] + ':'):
                     m = re.search(r'%s:\s+%s' % usb_field, line)
@@ -163,6 +171,8 @@ class VBox(object):
 
                     # Once we've parsed all fields for one USB device, save it.
                     if usb_field[0] == self.USB_PARSER[-1][0]:
+                        current_usb_device['AttachedToThisVM'] = \
+                                current_usb_device['UUID'] in vm_uuids
                         usb_devices.append(current_usb_device.copy())
 
         return usb_devices
