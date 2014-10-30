@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 
 import urwid
 import subprocess
@@ -243,7 +243,7 @@ class Window(object):
         self.label = urwid.AttrMap(self.label_text, 'highlight')
 
         nil_screen = {'__nil__': Screen(lambda _: [])}
-        self.screens = dict(screens.items() | nil_screen.items())
+        self.screens = dict(screens.items() + nil_screen.items())
         self.screen_stack = [('__nil__', [])]
 
         palette = [
