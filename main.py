@@ -224,7 +224,9 @@ class Screen(object):
         self.listwalker = urwid.SimpleListWalker([])
 
     def update(self, args):
-        self.listwalker[:] = self.generator(args)
+        (shortcuts, description, items) = self.generator(args)
+        self.listwalker[:] = items
+        return (shortcuts, description)
 
     def get_current(self):
         vm = self.listwalker.focus
@@ -236,13 +238,15 @@ class Screen(object):
 
 class Window(object):
 
+    BASE_SHORTCUTS = [('q', 'Quit'), ('r', 'Refresh')]
+
     def __init__(self, screens, first_screen):
-        self.shortcuts_text = urwid.Text(' q: Quit / r: Refresh')
-        self.label_text = urwid.Text(' VM Selection')
+        self.shortcuts_text = urwid.Text('')
+        self.label_text = urwid.Text('')
         self.shortcuts = urwid.AttrMap(self.shortcuts_text, 'highlight')
         self.label = urwid.AttrMap(self.label_text, 'highlight')
 
-        nil_screen = {'__nil__': Screen(lambda _: [])}
+        nil_screen = {'__nil__': Screen(lambda _: ([], '', []))}
         self.screens = dict(screens.items() | nil_screen.items())
         self.screen_stack = [('__nil__', [])]
 
@@ -287,17 +291,24 @@ class Window(object):
     def _switch(self, screen, args):
         self.current_screen = screen
         self.current_args = args
-        self.screens[screen].update(args)
+        self._update_screen()
 
         listbox = self.wrap_listwalker(self.screens[screen].listwalker)
         self.main.contents.update(body=(listbox, None))
+
+    def _update_screen(self):
+        (shortcuts, description) = \
+                self.screens[self.current_screen].update(self.current_args)
+        sc = [':'.join(s) for s in (self.BASE_SHORTCUTS + shortcuts)]
+        self.shortcuts.original_widget.set_text('  '.join(sc))
+        self.label.original_widget.set_text(description)
 
     def handle_input(self, key):
         if key in ('q', 'Q'):
             raise urwid.ExitMainLoop()
 
         if key in ('r', 'R'):
-            self.screens[self.current_screen].update(self.current_args)
+            self._update_screen()
 
         elif key in ('j',):
             self.move_selection(1)
@@ -315,16 +326,25 @@ class Window(object):
 vbox = VBox()
 
 def update_vms(_):
-    return [VMWidget(v[0], v[1]) for v in vbox.vms()]
+    shortcuts = [('e', 'Edit'), ('u', 'USB')]
+    description = 'VM Selection'
+    items = [VMWidget(v[0], v[1]) for v in vbox.vms()]
+    return (shortcuts, description, items)
 
 def update_props(args):
     vm_name = args[0]
-    return [PropWidget(k, v) for k,v in vbox.properties(vm_name).items()]
+    shortcuts = [('e', 'Edit')]
+    description = vm_name + ' properties'
+    items = [PropWidget(k, v) for k,v in vbox.properties(vm_name).items()]
+    return (shortcuts, description, items)
 
 def update_usb_list(args):
     vm_name = args[0]
-    return [USBWidget(vm_name, attributes) for attributes in \
+    shortcuts = [('<Space>', 'Toggle')]
+    description = vm_name + ' USB devices'
+    items = [USBWidget(vm_name, attributes) for attributes in \
             vbox.usb_list(vm_name)]
+    return (shortcuts, description, items)
 
 screens = {
         'vm': Screen(update_vms),
