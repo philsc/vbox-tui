@@ -26,6 +26,10 @@ class Screen(object):
     def _generator(self, _):
         raise Exception('This must be implemented by child classes')
 
+    def handle_input(self, _):
+        # We don't do anything with input by default.
+        pass
+
 
 class VmScreen(Screen):
 
@@ -126,11 +130,16 @@ class UsbScreen(Screen):
 
     def _generator(self, args):
         vm_name = args[0]
-        shortcuts = [('<Space>', 'Toggle')]
+        shortcuts = [('<Space>', 'Toggle'), ('v', 'Verbose')]
         description = vm_name + ' USB devices'
         self.items = [self.USBWidget(vm_name, attributes) for attributes in \
                 vbox.usb_list(vm_name)]
         return (shortcuts, description, self.items)
+
+    def handle_input(self, key):
+        if key in ('v',):
+            for item in self.items:
+                item.toggle_verbosity()
 
     class USBWidget(urwid.WidgetWrap):
 
@@ -138,6 +147,7 @@ class UsbScreen(Screen):
             self.vm_name = vm_name
             self.attributes = attributes
             self.item = urwid.AttrMap(urwid.Text(''), 'body', 'focus')
+            self.verbose = False
             self._update_text()
             self.__super.__init__(self.item)
 
@@ -173,7 +183,20 @@ class UsbScreen(Screen):
             else:
                 selector = '( )'
 
-            self.item.original_widget.set_text(' %-3s %s' % (selector, name))
+            if self.verbose:
+                vid = self.attributes['VendorId']
+                pid = self.attributes['ProductId']
+                manufacturer = self.attributes['Manufacturer']
+                new_text = '%4s %s\n %8sVID,PID: %s,%s  Manufacturer: %-20s' \
+                    % (selector, name, '', vid, pid, manufacturer)
+            else:
+                new_text = ' %-3s %s' % (selector, name)
+
+            self.item.original_widget.set_text(new_text)
+
+        def toggle_verbosity(self):
+            self.verbose ^= True
+            self._update_text()
 
 
 class VBox(object):
@@ -191,7 +214,8 @@ class VBox(object):
             ('VendorId', '.*\((.*)\)$'),
             ('ProductId', '.*\((.*)\)$'),
             ('Product', '(.*)$'),
-            ('Current State', '(.*)'),
+            ('Manufacturer', '(.*)$'),
+            ('Current State', '(.*)'), # Make sure this is the last entry.
             ]
 
     def vms(self):
@@ -353,6 +377,9 @@ class Window(object):
 
         elif key in ('h', 'esc'):
             self.last_screen()
+
+        else:
+            self.screens[self.current_screen].handle_input(key)
 
     def run(self):
         self.loop.run()
