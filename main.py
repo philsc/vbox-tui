@@ -5,125 +5,175 @@ import subprocess
 import shlex
 import re
 
-class EditDialog(urwid.WidgetWrap):
 
-    signals = ['close']
+class Screen(object):
 
-    def __init__(self, parent):
-        self.parent = parent
-        self.label = urwid.Text("Edit dialog!")
-        self.edit = urwid.Edit(edit_text=parent.value)
-        pile = urwid.Pile([self.label, self.edit])
-        fill = urwid.Filler(pile)
-        self.__super.__init__(urwid.AttrWrap(fill, 'popbg'))
+    def __init__(self):
+        self.listwalker = urwid.SimpleListWalker([])
 
-    def keypress(self, size, key):
-        if key in ('enter',):
-            self.parent.update_value(self.edit.edit_text)
-            self._emit('close')
+    def update(self, args):
+        (shortcuts, description, items) = self._generator(args)
+        self.listwalker[:] = items
+        return (shortcuts, description)
 
-        elif key in ('esc',):
-            self._emit('close')
+    def get_current(self):
+        vm = self.listwalker.focus
+        if vm:
+            return self.listwalker[vm].name
 
-        else:
-            self.__super.keypress(size, key)
+        raise Exception('Could not determine current focus')
 
-class VMWidget (urwid.WidgetWrap):
+    def _generator(self, _):
+        raise Exception('This must be implemented by child classes')
 
-    def __init__ (self, state, name):
-        self.state = state
-        self.name = name
-        self.item = urwid.AttrMap(
-                urwid.Text('%-15s  %s' % (state, name)), 'body', 'focus'
-                )
-        self.__super.__init__(self.item)
 
-    def selectable (self):
-        return True
+class VmScreen(Screen):
 
-    def keypress(self, size, key):
-        if key in ('e', 'enter', 'l'):
-            window.new_screen('props', [self.name])
+    def _generator(self, _):
+        shortcuts = [('e', 'Edit'), ('u', 'USB')]
+        description = 'VM Selection'
+        self.items = [self.VmWidget(v[0], v[1]) for v in vbox.vms()]
+        return (shortcuts, description, self.items)
 
-        elif key in ('u',):
-            window.new_screen('usb', [self.name])
+    class VmWidget (urwid.WidgetWrap):
 
-        else:
+        def __init__ (self, state, name):
+            self.state = state
+            self.name = name
+            self.item = urwid.AttrMap(
+                    urwid.Text('%-15s  %s' % (state, name)), 'body', 'focus'
+                    )
+            self.__super.__init__(self.item)
+
+        def selectable (self):
+            return True
+
+        def keypress(self, size, key):
+            if key in ('e', 'enter', 'l'):
+                window.new_screen('props', [self.name])
+
+            elif key in ('u',):
+                window.new_screen('usb', [self.name])
+
+            else:
+                return key
+
+class PropScreen(Screen):
+
+    def _generator(self, args):
+        vm_name = args[0]
+        shortcuts = [('e', 'Edit')]
+        description = vm_name + ' properties'
+        self.items = [self.PropWidget(k, v) for k,v in \
+                vbox.properties(vm_name).items()]
+        return (shortcuts, description, self.items)
+
+    class EditDialog(urwid.WidgetWrap):
+
+        signals = ['close']
+
+        def __init__(self, parent):
+            self.parent = parent
+            self.label = urwid.Text("Edit dialog!")
+            self.edit = urwid.Edit(edit_text=parent.value)
+            pile = urwid.Pile([self.label, self.edit])
+            fill = urwid.Filler(pile)
+            self.__super.__init__(urwid.AttrWrap(fill, 'popbg'))
+
+        def keypress(self, size, key):
+            if key in ('enter',):
+                self.parent.update_value(self.edit.edit_text)
+                self._emit('close')
+
+            elif key in ('esc',):
+                self._emit('close')
+
+            else:
+                self.__super.keypress(size, key)
+
+    class PropWidget(urwid.PopUpLauncher):
+
+        def __init__(self, prop, value):
+            self.prop = prop
+            self.value = None
+            self.item = urwid.AttrMap(urwid.Text('placeholder'), 'body', 'focus')
+            self.update_value(value)
+            self.__super.__init__(self.item)
+
+        def selectable(self):
+            return True
+
+        def keypress(self, size, key):
+            if key in ('e', 'l'):
+                self.open_pop_up()
+            else:
+                return key
+
+        def create_pop_up(self):
+            pop_up = PropScreen.EditDialog(self)
+            urwid.connect_signal(pop_up, 'close',
+                    lambda button: self.close_pop_up())
+            return pop_up
+
+        def get_pop_up_parameters(self):
+            return {'left': 0, 'top': 1, 'overlay_width': 32, 'overlay_height': 7}
+
+        def update_value(self, new_value):
+            self.value = new_value
+            self.item.original_widget.set_text(' %15s:  %s' % (self.prop, self.value))
+
+class UsbScreen(Screen):
+
+    def _generator(self, args):
+        vm_name = args[0]
+        shortcuts = [('<Space>', 'Toggle')]
+        description = vm_name + ' USB devices'
+        self.items = [self.USBWidget(vm_name, attributes) for attributes in \
+                vbox.usb_list(vm_name)]
+        return (shortcuts, description, self.items)
+
+    class USBWidget(urwid.WidgetWrap):
+
+        def __init__(self, vm_name, attributes):
+            self.vm_name = vm_name
+            self.attributes = attributes
+            self.item = urwid.AttrMap(urwid.Text(''), 'body', 'focus')
+            self._update_text()
+            self.__super.__init__(self.item)
+
+        def selectable(self):
+            return True
+
+        def keypress(self, size, key):
+            if key in (' ', 'enter', 'l'):
+                if self.attributes['Current State'] != 'Busy':
+                    if self.attributes['AttachedToThisVM']:
+                        action = 'detach'
+                    else:
+                        action = 'attach'
+
+                    try:
+                        vbox.modify_usb(self.vm_name, action, \
+                                self.attributes['UUID'])
+                    except:
+                        return
+
+                    self.attributes['AttachedToThisVM'] ^= True
+                    self._update_text()
+
             return key
 
-class PropWidget(urwid.PopUpLauncher):
+        def _update_text(self):
+            name = self.attributes['Product']
 
-    def __init__(self, prop, value):
-        self.prop = prop
-        self.value = None
-        self.item = urwid.AttrMap(urwid.Text('placeholder'), 'body', 'focus')
-        self.update_value(value)
-        self.__super.__init__(self.item)
+            if self.attributes['Current State'] == 'Busy':
+                selector = ''
+            elif self.attributes['AttachedToThisVM']:
+                selector = '(x)'
+            else:
+                selector = '( )'
 
-    def selectable(self):
-        return True
-
-    def keypress(self, size, key):
-        if key in ('e', 'l'):
-            self.open_pop_up()
-        else:
-            return key
-
-    def create_pop_up(self):
-        pop_up = EditDialog(self)
-        urwid.connect_signal(pop_up, 'close',
-                lambda button: self.close_pop_up())
-        return pop_up
-
-    def get_pop_up_parameters(self):
-        return {'left': 0, 'top': 1, 'overlay_width': 32, 'overlay_height': 7}
-
-    def update_value(self, new_value):
-        self.value = new_value
-        self.item.original_widget.set_text(' %15s:  %s' % (self.prop, self.value))
-
-class USBWidget(urwid.WidgetWrap):
-
-    def __init__(self, vm_name, attributes):
-        self.vm_name = vm_name
-        self.attributes = attributes
-        self.item = urwid.AttrMap(urwid.Text(''), 'body', 'focus')
-        self._update_text()
-        self.__super.__init__(self.item)
-
-    def selectable(self):
-        return True
-
-    def keypress(self, size, key):
-        if key in (' ', 'enter', 'l'):
-            if self.attributes['Current State'] != 'Busy':
-                if self.attributes['AttachedToThisVM']:
-                    action = 'detach'
-                else:
-                    action = 'attach'
-
-                try:
-                    vbox.modify_usb(self.vm_name, action, \
-                            self.attributes['UUID'])
-                except:
-                    return
-
-                self.attributes['AttachedToThisVM'] ^= True
-                self._update_text()
-
-        return key
-
-    def _update_text(self):
-        name = self.attributes['Product']
-
-        if self.attributes['Current State'] == 'Busy':
-            selector = ''
-        elif self.attributes['AttachedToThisVM']:
-            selector = '(x)'
-        else:
-            selector = '( )'
-
-        self.item.original_widget.set_text(' %-3s %s' % (selector, name))
+            self.item.original_widget.set_text(' %-3s %s' % (selector, name))
 
 
 class VBox(object):
@@ -217,25 +267,6 @@ class VBox(object):
         return out.decode('utf-8')
 
 
-class Screen(object):
-
-    def __init__(self, generator):
-        self.generator = generator
-        self.listwalker = urwid.SimpleListWalker([])
-
-    def update(self, args):
-        (shortcuts, description, items) = self.generator(args)
-        self.listwalker[:] = items
-        return (shortcuts, description)
-
-    def get_current(self):
-        vm = self.listwalker.focus
-        if vm:
-            return self.listwalker[vm].name
-
-        raise Exception('Could not determine current focus')
-
-
 class Window(object):
 
     BASE_SHORTCUTS = [('q', 'Quit'), ('r', 'Refresh')]
@@ -246,7 +277,11 @@ class Window(object):
         self.shortcuts = urwid.AttrMap(self.shortcuts_text, 'highlight')
         self.label = urwid.AttrMap(self.label_text, 'highlight')
 
-        nil_screen = {'__nil__': Screen(lambda _: ([], '', []))}
+        class NilScreen(Screen):
+            def _generator(self, _):
+                return ([], '', [])
+
+        nil_screen = {'__nil__': NilScreen() }
         self.screens = dict(screens.items() | nil_screen.items())
         self.screen_stack = [('__nil__', [])]
 
@@ -325,31 +360,10 @@ class Window(object):
 
 vbox = VBox()
 
-def update_vms(_):
-    shortcuts = [('e', 'Edit'), ('u', 'USB')]
-    description = 'VM Selection'
-    items = [VMWidget(v[0], v[1]) for v in vbox.vms()]
-    return (shortcuts, description, items)
-
-def update_props(args):
-    vm_name = args[0]
-    shortcuts = [('e', 'Edit')]
-    description = vm_name + ' properties'
-    items = [PropWidget(k, v) for k,v in vbox.properties(vm_name).items()]
-    return (shortcuts, description, items)
-
-def update_usb_list(args):
-    vm_name = args[0]
-    shortcuts = [('<Space>', 'Toggle')]
-    description = vm_name + ' USB devices'
-    items = [USBWidget(vm_name, attributes) for attributes in \
-            vbox.usb_list(vm_name)]
-    return (shortcuts, description, items)
-
 screens = {
-        'vm': Screen(update_vms),
-        'props': Screen(update_props),
-        'usb': Screen(update_usb_list),
+        'vm': VmScreen(),
+        'props': PropScreen(),
+        'usb': UsbScreen(),
         }
 
 window = Window(screens, 'vm')
