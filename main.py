@@ -156,29 +156,26 @@ class UsbScreen(Screen):
 
         def keypress(self, size, key):
             if key in (' ', 'enter', 'l'):
-                if self.attributes['Current State'] != 'Busy':
-                    if self.attributes['AttachedToThisVM']:
-                        action = 'detach'
-                    else:
-                        action = 'attach'
+                if self.attributes['AttachedToThisVM']:
+                    action = 'detach'
+                else:
+                    action = 'attach'
 
-                    try:
-                        vbox.modify_usb(self.vm_name, action, \
-                                self.attributes['UUID'])
-                    except:
-                        return
+                try:
+                    vbox.modify_usb(self.vm_name, action, \
+                            self.attributes['UUID'])
+                except:
+                    return
 
-                    self.attributes['AttachedToThisVM'] ^= True
-                    self._update_text()
+                self.attributes['AttachedToThisVM'] ^= True
+                self._update_text()
 
             return key
 
         def _update_text(self):
             name = self.attributes['Product']
 
-            if self.attributes['Current State'] == 'Busy':
-                selector = ''
-            elif self.attributes['AttachedToThisVM']:
+            if self.attributes['AttachedToThisVM']:
                 selector = '(x)'
             else:
                 selector = '( )'
