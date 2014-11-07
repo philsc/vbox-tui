@@ -5,7 +5,7 @@ Text-based UI frontend to VirtualBox' command line tools.
 
 Requirements
 ============
-- Python 3.x
+- Python 2.7+ or 3.2+
 - Urwid Library (http://urwid.org)
 
 I would recommend to grab the latest urwid library via ``pip`` or your other 
@@ -26,8 +26,8 @@ Usage
    cd vbox-tui
    ./main.py
 
-Even though the window doesn't say so, you can hit the ``u`` key to access the 
-USB view of a VM. Attach and detach USB devices with Space or Enter.
+You can hit the ``u`` key to access the USB view of a VM. Attach and detach USB 
+devices with Space or Enter.
 
 
 Limitations

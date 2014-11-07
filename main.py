@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import urwid
 import subprocess
@@ -303,7 +303,7 @@ class Window(object):
                 return ([], '', [])
 
         nil_screen = {'__nil__': NilScreen() }
-        self.screens = dict(screens.items() | nil_screen.items())
+        self.screens = dict(screens.items() + nil_screen.items())
         self.screen_stack = [('__nil__', [])]
 
         palette = [
