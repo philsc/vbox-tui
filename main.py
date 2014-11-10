@@ -99,10 +99,22 @@ class PropScreen(Screen):
 
         def __init__(self, prop, value):
             self.prop = prop
-            self.value = None
+            self._value = value
             self.item = urwid.AttrMap(urwid.Text('placeholder'), 'body', 'focus')
             self.update_value(value)
             self.__super.__init__(self.item)
+
+        @property
+        def value(self):
+            vbox_prop = VBox.PROPERTIES[self.prop]
+            prop_value_regex = vbox_prop['format'].replace('{}', '(.*)')
+            m = re.search(prop_value_regex, self._value)
+            if m: return m.group(1)
+            return 'Missing'
+
+        @value.setter
+        def value(self, new_value):
+            pass
 
         def selectable(self):
             return True
@@ -124,7 +136,8 @@ class PropScreen(Screen):
 
         def update_value(self, new_value):
             self.value = new_value
-            self.item.original_widget.set_text(' %15s:  %s' % (self.prop, self.value))
+            self.item.original_widget.set_text(' %15s:  %s' % (self.prop, \
+                    self._value))
 
 class UsbScreen(Screen):
 
@@ -199,12 +212,18 @@ class UsbScreen(Screen):
 class VBox(object):
     command = 'VBoxManage'
 
-    PROPERTIES = [
-            'Guest OS',
-            'Number of CPUs',
-            'Memory size',
-            'VRAM size',
-            ]
+    def property(extract=None, prop_type=str):
+        return {
+                'format': extract,
+                'type': prop_type,
+                }
+
+    PROPERTIES = {
+            'Guest OS': property('{}', str),
+            'Number of CPUs': property('{}', str),
+            'Memory size': property('{}MB', int),
+            'VRAM size': property('{}MB', str),
+            }
 
     USB_PARSER = [
             ('UUID', '([a-zA-Z0-9-]+)'),
@@ -231,12 +250,10 @@ class VBox(object):
     def properties(self, name):
         out = self._cmd('showvminfo ' + name)
 
-        # Create a copy of the properties list so we can modify it.
-        property_names = list(self.PROPERTIES)
         props = {}
 
         for line in out.splitlines():
-            for prop_name in property_names:
+            for prop_name in self.PROPERTIES.keys():
                 if line.startswith(prop_name):
                     m = re.search(r'%s:\s+(.+)' % prop_name, line)
                     if m: props[prop_name] = m.group(1)
