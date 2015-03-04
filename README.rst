@@ -32,7 +32,8 @@ devices with Space or Enter.
 
 Limitations
 ===========
-- Currently the TUI can only attach and detach USB devices.
+- Currently the TUI can only attach and detach USB devices. That was really the 
+  original goal of the project.
 
 
 TODO
